@@ -11,7 +11,7 @@ and just drop your data into the same serialized format Step 2a expects
 
 cd(@__DIR__)
 
-using ComponentArrays, Serialization, DifferentialEquations, LinearAlgebra, Random, DataFrames, CSV, Statistics, Printf
+using ComponentArrays, Serialization, DifferentialEquations, SciMLBase, LinearAlgebra, Random, DataFrames, CSV, Statistics, Printf
 using StableRNGs
 
 noise_magnitudes = [0.0, 0.05]

@@ -8,7 +8,7 @@ cd(@__DIR__)
 
 using ComponentArrays, Lux, SciMLSensitivity, Serialization, DifferentialEquations, LinearAlgebra, Random, DataFrames, Base.Threads, Dates
 using Optimization, OptimizationOptimisers, OptimizationOptimJL, StableRNGs
-using DiffEqFlux, .Flux
+using DiffEqFlux
 
 using PyCall
 optuna = pyimport("optuna")
@@ -228,7 +228,7 @@ function objective(trial)
     opt = OptimizationOptimisers.Adam(learning_rate_adam)
 
     stuck = [false]
-    res = Optimization.solve(optprob, opt, callback=(θ, l) -> callback(θ, l, training_epochs, training_costs, 500, stuck), maxiters=501)
+    res = Optimization.solve(optprob, opt, callback=(θ, l) -> callback(θ, l, training_epochs, training_costs, 20, stuck), maxiters=501)
 
     validation_resulting_cost = stuck[1] ? Inf : validation_loss_function(res.u)
 
@@ -256,7 +256,7 @@ end
 
 global trial_parameters = []
 study = optuna.create_study(sampler=optuna.samplers.TPESampler(consider_prior=false, n_startup_trials=200, multivariate=true, seed=0))
-for optuna_iteration in 1:500
+for optuna_iteration in 1:10
     trial = study.ask()
     res_trial = objective(trial)
 end

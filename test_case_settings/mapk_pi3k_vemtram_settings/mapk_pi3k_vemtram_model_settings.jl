@@ -137,8 +137,18 @@ const free_idx_hnode_mapk = setdiff(free_idx_mapk, nn_replaced_idx_mapk)
 @assert length(free_idx_hnode_mapk) == 60
 
 x0_free_hnode_mapk = original_parameters_mapk[free_idx_hnode_mapk]
-lower_bounds_hnode_mapk = x0_free_hnode_mapk .* bound_factor_low_mapk
-upper_bounds_hnode_mapk = x0_free_hnode_mapk .* bound_factor_high_mapk
+
+# NOTE: the full nominal/50-nominal*50 range (bound_factor_low_mapk/high_mapk above) is
+# far too wide to sample independently across 60 parameters simultaneously on a system
+# this large and stiff -- the joint probability that all 60 land somewhere numerically
+# integrable is essentially zero, which is why Step 2a was hitting the 1e6 fallback loss
+# on every single trial. Use a much tighter range for the actual TPE search space. Widen
+# this later (e.g. toward 1/2..2) once training is working reliably, if you want more
+# aggressive global exploration.
+const hnode_tuning_bound_factor_low = 1/1.5
+const hnode_tuning_bound_factor_high = 1.5
+lower_bounds_hnode_mapk = x0_free_hnode_mapk .* hnode_tuning_bound_factor_low
+upper_bounds_hnode_mapk = x0_free_hnode_mapk .* hnode_tuning_bound_factor_high
 for i in eachindex(x0_free_hnode_mapk)
     if x0_free_hnode_mapk[i] <= 0
         lower_bounds_hnode_mapk[i] = 0.0

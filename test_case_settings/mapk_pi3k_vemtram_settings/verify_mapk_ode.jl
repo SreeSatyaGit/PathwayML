@@ -12,7 +12,7 @@ optimization is for).
 =#
 
 cd(@__DIR__)
-using DifferentialEquations, Printf
+using DifferentialEquations, SciMLBase, Printf
 
 include("mapk_pi3k_vemtram_model_functions.jl")
 include("mapk_pi3k_vemtram_model_settings.jl")
@@ -26,7 +26,7 @@ prob = ODEProblem(mapk_ode!, original_u0_mapk, tspan, original_parameters_mapk)
 # rate constants (1e-9 to 1e-2 range), so stiffness is expected.
 sol = solve(prob, TRBDF2(autodiff=false), saveat=timestamps_minutes_mapk, abstol=1e-8, reltol=1e-6)
 
-if sol.retcode != :Success
+if sol.retcode != SciMLBase.ReturnCode.Success
     error("Integration failed with retcode = $(sol.retcode). Check for stiffness issues, " *
           "bad parameter values, or a transcription error in mapk_ode!.")
 end

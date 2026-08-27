@@ -5,7 +5,7 @@ step2b_model_trainer/train_mapk_hnode_00.jl's "TUNED HYPERPARAMETERS" block.
 =#
 
 cd(@__DIR__)
-using Serialization, PyCall
+using Serialization, PyCall, PyCall, ComponentArrays
 
 result = deserialize("results_mapk_hnode/mapk_hnode_00.jld")
 study = result.study

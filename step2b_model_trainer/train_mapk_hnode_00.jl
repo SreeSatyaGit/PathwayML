@@ -14,7 +14,7 @@ timepoints. "Best" here means lowest full-data training loss, tracked across
 
 cd(@__DIR__)
 
-using ComponentArrays, Lux, SciMLSensitivity, Serialization, DifferentialEquations, LinearAlgebra, Random, DataFrames, CSV, Statistics, Printf, Base.Threads, Dates
+using ComponentArrays, Lux, SciMLSensitivity, Serialization, DifferentialEquations, SciMLBase, LinearAlgebra, Random, DataFrames, CSV, Statistics, Printf, Base.Threads, Dates
 using Optimization, OptimizationOptimisers, OptimizationOptimJL, StableRNGs
 using DiffEqFlux
 
@@ -63,7 +63,7 @@ const species_extractors = (
 min_max_normalize_for_loss(v) = (v .- minimum(v)) ./ (maximum(v) - minimum(v) + 1e-6)
 
 function weighted_loss(sol)
-    if sol.retcode != :Success || length(sol.t) != length(timestamps_minutes_mapk)
+    if sol.retcode != SciMLBase.ReturnCode.Success || length(sol.t) != length(timestamps_minutes_mapk)
         return Inf
     end
     total = 0.0

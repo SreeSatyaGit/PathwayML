@@ -9,7 +9,7 @@ function generate_non_perturbed_training_set(ground_truth_function, u0, p, tspan
     ode_problem = ODEProblem(ground_truth_function, u0, tspan, p)
     solutions = solve(ode_problem, integrator, saveat=save_at, reltol=1e-8, abstol=1e-8)
 
-    if solutions.retcode != :Success
+    if !successful_retcode(solutions)
         #saving the data
         error("Integration with this parameters was not succesfull")
     else

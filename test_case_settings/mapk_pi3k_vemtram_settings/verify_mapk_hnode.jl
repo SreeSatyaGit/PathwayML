@@ -11,7 +11,7 @@ the dynamics are correct yet. That comes after Step 2a/2b training.
 =#
 
 cd(@__DIR__)
-using DifferentialEquations, Lux, ComponentArrays, Random, StableRNGs, Printf
+using DifferentialEquations, SciMLBase, Lux, ComponentArrays, Random, StableRNGs, Printf
 
 include("mapk_pi3k_vemtram_model_functions.jl")   # for OBSERVED_SPECIES, min_max_normalize
 include("mapk_pi3k_vemtram_hnode_functions.jl")
