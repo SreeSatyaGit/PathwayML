@@ -21,7 +21,7 @@ weighted sum of squared residuals against the real experimental data.
 
 cd(@__DIR__)
 
-using ComponentArrays, Lux, SciMLSensitivity, Serialization, DifferentialEquations, LinearAlgebra, Random, DataFrames, Dates
+using ComponentArrays, Lux, SciMLSensitivity, Serialization, DifferentialEquations, SciMLBase, LinearAlgebra, Random, DataFrames, Dates
 using Optimization, OptimizationOptimisers, OptimizationOptimJL, StableRNGs
 using DiffEqFlux
 
@@ -130,11 +130,15 @@ function objective(trial)
             sol = solve(prob, integrator; p=par, saveat=timestamps_minutes_mapk,
                         abstol=abstol, reltol=reltol, sensealg=sensealg,
                         unstable_check=unstable_check, verbose=false)
-        catch
+        catch e
+            println("INTEGRATION EXCEPTION: ", sprint(showerror, e))
+            flush(stdout)
             return 1e6
         end
-        data_loss = weighted_loss(sol, sol.retcode == :Success)
+        data_loss = weighted_loss(sol, sol.retcode == SciMLBase.ReturnCode.Success)
         if !isfinite(data_loss)
+            println("NON-FINITE LOSS: retcode=", sol.retcode, " npoints=", length(sol.t), " expected=", length(timestamps_minutes_mapk))
+            flush(stdout)
             return 1e6
         end
         reg_loss = l2_reg_weight * sum(abs2, θ.p.p_net)
@@ -142,8 +146,14 @@ function objective(trial)
     end
 
     epoch = 1
+    best_theta = Ref{Any}(nothing)
+    best_cost = Ref(Inf)
     function callback(θ, l, training_epochs, training_costs, num_epoch_to_finish, stuck)
         println("Epoch: " * string(epoch) * " - Loss: " * string(l))
+        if isfinite(l) && l < best_cost[]
+            best_cost[] = l
+            best_theta[] = deepcopy(θ)
+        end
         if epoch == num_epoch_to_finish
             return true
         end
@@ -180,27 +190,19 @@ function objective(trial)
     stuck = [false]
     res = Optimization.solve(optprob, opt, callback=(θ, l) -> callback(θ, l, training_epochs, training_costs, 300, stuck), maxiters=300)
 
-    final_cost = stuck[1] ? Inf : loss_fn(res.u)
+    # Use the BEST checkpoint reached during training, not wherever Adam happened to end
+    # up (which may have since drifted into an unstable region -- very possible over 300
+    # unconstrained gradient steps on this sensitive, stiff system). Falls back to the
+    # final state only in the edge case where literally no epoch produced a finite loss.
+    final_theta = best_theta[] === nothing ? res.u : best_theta[]
+    final_cost = best_cost[]
 
     global trial_parameters
-    push!(trial_parameters, deepcopy(res.u))
+    push!(trial_parameters, deepcopy(final_theta))
 
-    ode_par_optimized = res.u.p.ode_par .* original_param_vector
     study.tell(trial, final_cost)
 
-    result_trial = nothing
-    try
-        result_params = copy(trial.params)
-        for i in 1:n_mech_params
-            result_params["p$i"] = min(max(ode_par_optimized[i], lower_bounds_hnode_mapk[i]), upper_bounds_hnode_mapk[i])
-        end
-        result_trial = optuna.create_trial(params=result_params, distributions=trial.distributions, value=final_cost)
-        study.add_trial(result_trial)
-    catch
-        println("failed attempt")
-    end
-
-    return result_trial
+    return nothing
 end
 
 global trial_parameters = []
