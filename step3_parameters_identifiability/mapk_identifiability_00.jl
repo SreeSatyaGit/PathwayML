@@ -71,15 +71,20 @@ n_p_net = length(parameters_optimized.p_net)
 ##########################################################################################################################
 ##################################################### IDENTIFIABILITY ###################################################
 
+extract_species(state) = [
+    state[3], state[16] + state[18] + state[21], state[23], state[27], state[29], state[31],
+    state[53], state[59], state[6], state[9], state[65], state[67],
+]
+const species_names_ordered = ["pEGFR", "panRAS", "pCRAF", "pMEK", "pERK", "DUSP", "pAKT", "p4EBP1", "pHer2", "pHer3", "pDGFR", "pS6K"]
+
 # Model output: the 12 observed species (raw, not normalized) at a given time
 function model(params, final_time)
     prob = ODEProblem{true}(hnode_derivative_function, params.u0, (0, final_time))
     sol = solve(prob, integrator, p=params.pars, saveat=[0, final_time], abstol=abstol, reltol=reltol, sensealg=sensealg)
-    state = sol.u[end]
-    return [extractor(state) for extractor in OBSERVED_SPECIES]
+    return extract_species(sol.u[end])
 end
 
-first_point(p) = [extractor(p.u0) for extractor in OBSERVED_SPECIES]
+first_point(p) = extract_species(p.u0)
 
 n_timepoints = length(timestamps_minutes_mapk)
 
@@ -88,7 +93,7 @@ n_timepoints = length(timestamps_minutes_mapk)
 function get_fitted_trajectory_maxima()
     prob = ODEProblem{true}(hnode_derivative_function, parameters_optimized_def.u0, tspan)
     sol = solve(prob, integrator, p=parameters_optimized_def.pars, saveat=timestamps_minutes_mapk, abstol=abstol, reltol=reltol, sensealg=sensealg)
-    all_outputs = hcat([[extractor(sol.u[j]) for extractor in OBSERVED_SPECIES] for j in eachindex(sol.u)]...)
+    all_outputs = hcat([extract_species(sol.u[j]) for j in eachindex(sol.u)]...)
     return maximum(abs.(all_outputs), dims=2) .+ 1e-8  # avoid div-by-zero for a flat species
 end
 

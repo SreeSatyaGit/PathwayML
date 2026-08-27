@@ -1,0 +1,25 @@
+# Python virtual environment
+venv/
+.venv/
+
+# Julia
+Manifest.toml.bak
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+/docs/build/
+.CondaPkg/
+
+# Generated data / results (regenerate via the pipeline rather than committing)
+datasets/e0.0/
+datasets/e0.05/
+step2a_hyperparameter_tuning/results_vem_tram/
+step2b_model_trainer/res_vem_tram/
+step3_parameters_identifiability/results/
+step4_confidence_intervals/results/
+
+# OS / editor cruft
+.DS_Store
+*.swp
+.vscode/
+.idea/
