@@ -33,18 +33,78 @@ abstol = 1e-8
 reltol = 1e-6
 sensealg = QuadratureAdjoint(autojacvec=ReverseDiffVJP(true))
 
-################################### TUNED HYPERPARAMETERS (TODO: fill in from Step 2a) ###################################
+################################### TUNED HYPERPARAMETERS (from Step 2a, trial 57, loss=36.22) ###################################
 my_glorot_uniform(rng, dims...) = Lux.glorot_uniform(rng, dims...)
 approximating_neural_network = Lux.Chain(
-    Lux.Dense(2, 8, gelu; init_weight=my_glorot_uniform, init_bias=my_glorot_uniform),
-    Lux.Dense(8, 8, gelu; init_weight=my_glorot_uniform, init_bias=my_glorot_uniform),
-    Lux.Dense(8, 1; init_weight=my_glorot_uniform, init_bias=my_glorot_uniform),
+    Lux.Dense(2, 4, gelu; init_weight=my_glorot_uniform, init_bias=my_glorot_uniform),
+    Lux.Dense(4, 4, gelu; init_weight=my_glorot_uniform, init_bias=my_glorot_uniform),
+    Lux.Dense(4, 1; init_weight=my_glorot_uniform, init_bias=my_glorot_uniform),
 )
 
-learning_rate_adam = 0.01           # TODO: replace with tuned value
-l2_reg_weight = 1e-4                # TODO: replace with tuned value
-pretrained_ode_pars = copy(original_parameters_mapk[free_idx_hnode_mapk])  # TODO: replace with
-                                                                             # the p1..p60 estimates from Step 2a
+learning_rate_adam = 0.054614047396410015
+l2_reg_weight = 0.010728454807525285
+pretrained_ode_pars = [
+    0.00014952681595824382,
+    1.30308589941516e-5,
+    0.00813933029691123,
+    0.0011632747733238344,
+    8.070356432174929e-6,
+    0.0001765063869667299,
+    1.0588206903740985e-6,
+    2.7186726439249697e-5,
+    7.44819934613396e-5,
+    5.296821328068194e-7,
+    3.317474719749065e-5,
+    0.00012565489046763756,
+    0.00013202806464836052,
+    2.192297288040839e-5,
+    1.8413560353108615e-5,
+    0.00023556822488425804,
+    0.0001925790519370612,
+    1.7995515100700067e-8,
+    0.00031691724957059043,
+    1.794822284708193e-7,
+    0.11184169661899063,
+    0.00023516834316788686,
+    1.2805377424168173e-8,
+    1.4277723068026116e-6,
+    4.5819278528753084e-5,
+    8.91711332927795e-7,
+    5.949649237855862e-5,
+    1.1281626955797748e-8,
+    1.6678857728588806e-6,
+    1.3413135134698941e-5,
+    8.413900312887038e-7,
+    7.948156323052933e-5,
+    0.00014019905314042495,
+    0.0011816435625026601,
+    0.001339804964075141,
+    0.0010165578614430904,
+    0.001406754833059754,
+    0.0001139087821255205,
+    0.0008440509735862435,
+    0.0008807355506721509,
+    0.0010099766014008706,
+    0.00010785623952500674,
+    0.00014850881006455246,
+    8.203942991730632e-7,
+    1.4071008876592416e-7,
+    0.01454191052567207,
+    0.00010556569450137794,
+    0.00012358699051310957,
+    6.906144727210598e-6,
+    6.373161224977899e-6,
+    1.139080115745616e-5,
+    1.1689039044983832e-5,
+    3.27989599022415e-6,
+    7.942428779092572e-6,
+    6.858365747073108e-6,
+    0.00010410682969290513,
+    0.0010347594398595148,
+    0.0001388848499399769,
+    8.508192114072424e-5,
+    0.07075232890900235
+]
 ###########################################################################################################################
 
 rng = Random.default_rng()
