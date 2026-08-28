@@ -92,7 +92,7 @@ sol_pi3ki_central = solve(prob_pi3ki, integrator, p=fitted_pars, saveat=tfine_mi
 
 println("Simulating uncertainty band (perturbing non-identifiable PI3K-submodule parameters)...")
 
-# indices of these parameters WITHIN free_idx_hnode_mapk / fitted_pars.pars.ode_par
+# indices of these parameters WITHIN free_idx_hnode_mapk / fitted_pars.ode_par
 const all_param_names = [
     "ka1","kr1","kc1","kpCraf","kpMek","kpErk","kDegradEgfr","kErkInbEgfr","kShcDephos","kptpDeg",
     "kGrb2CombShc","kSprtyInbGrb2","kSosCombGrb2","kErkPhosSos","kErkPhosPcraf","kPcrafDegrad","kErkPhosMek","kMekDegrad",
@@ -116,10 +116,13 @@ Random.seed!(rng, 42)
 
 species_names_grid = ["pEGFR", "panRAS", "pCRAF", "pMEK", "pERK", "DUSP", "pAKT", "p4EBP1", "pHer2", "pHer3", "pDGFR", "pS6K"]
 n_fine = length(tfine_minutes)
-envelope = Dict(name => zeros(n_samples, n_fine) for name in species_names_grid)
+envelope = Dict{String, Matrix{Float64}}()
+for name in species_names_grid
+    envelope[name] = zeros(n_samples, n_fine)
+end
 
 for s in 1:n_samples
-    perturbed_ode_par = copy(fitted_pars.pars.ode_par)
+    perturbed_ode_par = copy(fitted_pars.ode_par)
     for idx in uncertain_indices
         factor = exp(rand(rng) * (log(perturbation_range[2]) - log(perturbation_range[1])) + log(perturbation_range[1]))
         perturbed_ode_par[idx] *= factor
@@ -137,7 +140,7 @@ for s in 1:n_samples
     end
 
     for (name, extractor) in pairs(OBSERVED_SPECIES)
-        envelope[name][s, :] = [extractor(sol.u[j]) for j in eachindex(sol.u)]
+        envelope[String(name)][s, :] = [extractor(sol.u[j]) for j in eachindex(sol.u)]
     end
 end
 
@@ -153,9 +156,9 @@ for (name, extractor) in pairs(OBSERVED_SPECIES)
     df[!, "$(name)_vemtram_baseline_norm"] = min_max_normalize(baseline_raw)
     df[!, "$(name)_vempi3ki_central_norm"] = min_max_normalize(central_raw)
 
-    band_min = vec(minimum(envelope[name], dims=1))
-    band_max = vec(maximum(envelope[name], dims=1))
-    band_median = vec(median(envelope[name], dims=1))
+    band_min = vec(minimum(envelope[String(name)], dims=1))
+    band_max = vec(maximum(envelope[String(name)], dims=1))
+    band_median = vec(median(envelope[String(name)], dims=1))
     df[!, "$(name)_vempi3ki_band_min_norm"] = min_max_normalize(band_min)
     df[!, "$(name)_vempi3ki_band_max_norm"] = min_max_normalize(band_max)
     df[!, "$(name)_vempi3ki_band_median_norm"] = min_max_normalize(band_median)
