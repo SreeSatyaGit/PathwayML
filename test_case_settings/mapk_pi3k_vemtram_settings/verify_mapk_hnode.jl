@@ -52,7 +52,7 @@ prob = ODEProblem{true}(hnode_derivative_function, original_u0_mapk, tspan, p)
 println("Integrating HNODE system (untrained NN -- dynamics will look wrong, that's expected)...")
 sol = solve(prob, TRBDF2(autodiff=false), saveat=timestamps_minutes_mapk, abstol=1e-8, reltol=1e-6)
 
-if sol.retcode != :Success
+if sol.retcode != SciMLBase.ReturnCode.Success
     error("HNODE integration failed with retcode = $(sol.retcode). Check the NN " *
           "input/output wiring and full-parameter-vector reconstruction in " *
           "mapk_pi3k_vemtram_hnode_functions.jl before proceeding to Step 2a.")

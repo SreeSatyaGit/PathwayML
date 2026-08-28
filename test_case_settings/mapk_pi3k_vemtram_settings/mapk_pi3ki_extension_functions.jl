@@ -1,62 +1,40 @@
 #=
-HNODE variant of the 68-state MAPK/PI3K + Vem/Tram model. Every equation is
-identical to `mapk_ode!` in mapk_pi3k_vemtram_model_functions.jl EXCEPT for one
-line: the paradoxical RAF activation term
+Extends the fitted Vem+Tram HNODE derivative function with a PI3K inhibitor term, for
+"what-if" prediction only -- NOT part of the validated Vem+Tram pipeline, and NOT refit
+against any data (there is none for this combination). All mechanistic parameters and NN
+weights are taken as-is from the Step 2b fit; only a new inhibition term is added.
 
-    paradox_activation = kParadoxCRAF * Vemurafenib * u[62]
+MECHANISM: standard Hill-type competitive inhibition on the PI3K catalytic step (PIP2 ->
+PIP3), matching how a real PI3K inhibitor works (blocks the kinase's catalytic activity),
+and structurally mirroring how Vemurafenib's effect on BRAF is already modeled in this
+system.
 
-(previously added into du[23], the pCRAF equation) is replaced by
+PARAMETERIZATION: alpelisib (BYL719), a clinically-approved PI3Kalpha inhibitor.
+  - IC50 = 4.6 nM (biochemical/enzymatic assay potency against p110-alpha; Fritsch et al.,
+    consistent across multiple regulatory/literature sources)
+  - Hill coefficient = 1.0 (standard, non-cooperative competitive inhibition assumption --
+    not separately reported for alpelisib, this is a reasonable default, not a measured value)
+  - Reference clinical concentration = 5.62 uM, converted from the reported mean steady-state
+    Cmax of 2480 ng/mL at the approved 300mg once-daily dose (SOLAR-1 trial population PK),
+    using alpelisib's molecular weight (~441.47 g/mol). This uses TOTAL plasma concentration,
+    not accounting for plasma protein binding (~89% bound) -- the same simplification already
+    used for Vemurafenib/Trametinib elsewhere in this model, not a new inconsistency introduced
+    here.
 
-    paradox_activation = NN([u[62], Vemurafenib], p.p_net, st)[1]
-
-i.e. the neural network learns the entire functional relationship between the
-BRAF-CRAF dimer level, the Vemurafenib concentration, and the resulting
-paradoxical CRAF activation rate -- not just a scalar rate constant. This
-means parameter 61 (kParadoxCRAF) is no longer a mechanistic parameter to fit;
-it's dropped from the free-parameter set (see `free_idx_hnode` in the
-settings file).
-
-Because Vemurafenib concentration is constant within any one simulated
-trajectory in this dataset (no time-varying dosing/PK model here), the NN
-effectively learns a 1-D function of dimer level for this particular dataset.
-Passing the concentration as an explicit second input anyway preserves the
-correct causal structure and means this would generalize correctly if you
-later fit against a dose-ranging dataset instead of a single fixed dose.
+CAVEAT (see project documentation): k_PIP2_to_PIP3, k_PI3K_recruit, kMTOR_Feedback, and most
+of the PI3K/AKT/mTOR submodule were classified NON-IDENTIFIABLE by the Step 3 analysis on
+Vem+Tram data. Predictions using this extension are exploratory hypotheses about pathway
+behavior, not validated forecasts -- see predict_vem_pi3ki.jl's uncertainty-band construction.
 =#
 
-"""
-    assemble_full_parameter_vector(mechanistic_scaled, free_idx_no_nn, fixed_idx, fixed_values)
-
-Reconstructs the full 68-length parameter vector needed by the equations from:
-  - the free (fitted) mechanistic parameters, scaled by their original nominal
-    values, placed at `free_idx_no_nn`
-  - the known constants placed at `fixed_idx`
-  - position 61 (kParadoxCRAF) is left at 0 and is simply unused, since the
-    paradox activation term is computed by the neural network instead.
-"""
-function assemble_full_parameter_vector(mechanistic_scaled::AbstractVector,
-                                          free_idx_no_nn::Vector{Int},
-                                          fixed_idx::Vector{Int},
-                                          fixed_values::Vector{Float64})
-    p_full = zeros(eltype(mechanistic_scaled), 68)
-    p_full[free_idx_no_nn] .= mechanistic_scaled
-    p_full[fixed_idx] .= fixed_values
-    return p_full
-end
-
-"""
-    get_uode_model_function(appr_neural_network, state, original_parameters_opt, free_idx_no_nn, fixed_idx, fixed_values)
-
-Returns the HNODE derivative function `f(du, u, p, t)` where `p` is expected to
-be a ComponentArray with `p.ode_par` (60 free mechanistic parameters, scaled to
-~1.0) and `p.p_net` (neural network parameters).
-"""
-function get_uode_model_function(appr_neural_network, state, original_parameters_opt,
-                                   free_idx_no_nn, fixed_idx, fixed_values)
+function get_uode_model_function_with_pi3ki(appr_neural_network, state, original_parameters_opt,
+                                              free_idx_no_nn, fixed_idx, fixed_values,
+                                              pi3ki_conc, pi3ki_ic50, pi3ki_hill_n)
     f(du, u, p, t) =
         let appr_neural_network = appr_neural_network, st = state,
             original_parameters_opt = original_parameters_opt,
-            free_idx_no_nn = free_idx_no_nn, fixed_idx = fixed_idx, fixed_values = fixed_values
+            free_idx_no_nn = free_idx_no_nn, fixed_idx = fixed_idx, fixed_values = fixed_values,
+            pi3ki_conc = pi3ki_conc, pi3ki_ic50 = pi3ki_ic50, pi3ki_hill_n = pi3ki_hill_n
 
             mechanistic_scaled = p.ode_par .* original_parameters_opt
             p_full = assemble_full_parameter_vector(mechanistic_scaled, free_idx_no_nn, fixed_idx, fixed_values)
@@ -75,7 +53,6 @@ function get_uode_model_function(appr_neural_network, state, original_parameters
             Tram=p_full[54]; K_tram_RAF=p_full[55]; K_tram_KSR=p_full[56]; n_tram=p_full[57]
             Vemurafenib=p_full[58]
             kDimerForm=p_full[59]; kDimerDissoc=p_full[60]
-            # p_full[61] (kParadoxCRAF) intentionally unused -- the NN replaces this term
             IC50_vem=p_full[62]; Hill_n_vem=p_full[63]
             kPDGFR_act=p_full[64]; k_p85_bind_PDGFR=p_full[65]; kS6K_phos=p_full[66]; kS6K_dephos=p_full[67]
             K_displace=p_full[68]
@@ -109,19 +86,9 @@ function get_uode_model_function(appr_neural_network, state, original_parameters
             Vem_n = Vemurafenib^Hill_n_vem
             kBRAF_eff = ka1 * IC50_n / (IC50_n + Vem_n + eps())
 
-            # === THE REPLACED TERM ===
-            # Original: paradox_activation = kParadoxCRAF * Vemurafenib * u[62]
-            # The original term is always in [0, ~0.5] (kParadoxCRAF ~ 0.5, Vemurafenib and
-            # dimer both in [0,1]-ish ranges). An unbounded raw NN output can come out
-            # arbitrarily large (or negative) early in training, which is enough to blow up
-            # this stiff system numerically. Squash through a sigmoid, scaled to roughly the
-            # same physical range as the term being replaced, so the ODE stays integrable
-            # regardless of the NN's (possibly bad, early-training) raw output.
             nn_input = [u[62], Vemurafenib]
             û = appr_neural_network(nn_input, p.p_net, st)[1]
-            paradox_activation_scale = 1.0   # covers the plausible ~0-0.5 range with margin
-            paradox_activation = paradox_activation_scale / (1.0 + exp(-û[1]))
-            # ==========================
+            paradox_activation = 1.0 / (1.0 + exp(-û[1]))
 
             @inbounds du[22] = -kpCraf*panRAS_active*u[22] + kErkPhosPcraf*u[29]*u[23] + kPcrafDegrad*u[23]*u[36] - kDimerForm*u[25]*u[22]*Vemurafenib + kDimerDissoc*u[62]
             @inbounds du[23] = kpCraf*panRAS_active*u[22] - kErkPhosPcraf*u[29]*u[23] - kPcrafDegrad*u[23]*u[36] + paradox_activation
@@ -164,8 +131,15 @@ function get_uode_model_function(appr_neural_network, state, original_parameters
             total_p85_RTK = u[44] + u[45] + u[46] + u[47] + u[68]
             @inbounds du[48] = -k_PI3K_recruit*total_p85_RTK*u[48] + kMTOR_Feedback*u[56]*u[49]
             @inbounds du[49] = k_PI3K_recruit*total_p85_RTK*u[48] - kMTOR_Feedback*u[56]*u[49]
-            @inbounds du[50] = -k_PIP2_to_PIP3*u[49]*u[50] + k_PTEN*u[51]
-            @inbounds du[51] = k_PIP2_to_PIP3*u[49]*u[50] - k_PTEN*u[51]
+
+            # === PI3K INHIBITOR TERM (new) ===
+            # Standard Hill-type competitive inhibition of the PIP2->PIP3 catalytic step
+            I_pi3ki = pi3ki_conc^pi3ki_hill_n / (pi3ki_ic50^pi3ki_hill_n + pi3ki_conc^pi3ki_hill_n + eps())
+            k_PIP2_to_PIP3_effective = k_PIP2_to_PIP3 * (1 - I_pi3ki)
+            # ===================================
+
+            @inbounds du[50] = -k_PIP2_to_PIP3_effective*u[49]*u[50] + k_PTEN*u[51]
+            @inbounds du[51] = k_PIP2_to_PIP3_effective*u[49]*u[50] - k_PTEN*u[51]
             @inbounds du[52] = -kAkt*u[51]*u[52] + kdegradAKT*u[53]
             @inbounds du[53] = kAkt*u[51]*u[52] - kdegradAKT*u[53]
             @inbounds du[54] = (max(0, 1 - u[53])) * kAkt / (max(0.1, 1 + (u[54] / 15e-5)))
